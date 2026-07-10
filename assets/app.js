@@ -42,8 +42,13 @@ function renderCard(node) {
   const card = document.createElement("div");
   card.className = "card";
   let media = "";
-  if (node.type === "image" && node.image) {
-    media = `<img class="card-img" src="${esc(node.image)}" alt="${esc(node.title)}" />`;
+  // 兼容旧的单图字段 image，新的是 images 数组
+  const imgs = Array.isArray(node.images) ? node.images : (node.image ? [node.image] : []);
+  if (node.type === "image" && imgs.length) {
+    const cls = imgs.length > 1 ? "card-imgs multi" : "card-imgs";
+    media = `<div class="${cls}">` +
+      imgs.map((src) => `<img class="card-img zoomable" src="${esc(src)}" alt="${esc(node.title)}" loading="lazy" />`).join("") +
+      `</div>`;
   } else if (node.type === "video" && node.video) {
     const src = toEmbedUrl(node.video);
     if (src) {
@@ -154,7 +159,31 @@ async function load() {
   }
 }
 
+/* ---------- 图片点击放大（灯箱） ---------- */
+function setupLightbox() {
+  let box = document.getElementById("lightbox");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "lightbox";
+    box.className = "lightbox";
+    box.innerHTML = `<span class="lightbox-close" aria-label="关闭">✕</span><img alt="放大查看" />`;
+    document.body.appendChild(box);
+    const close = () => box.classList.remove("open");
+    box.addEventListener("click", close);
+    box.querySelector("img").addEventListener("click", (e) => e.stopPropagation());
+    box.querySelector("img").addEventListener("click", close);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+  }
+  document.getElementById("content").addEventListener("click", (e) => {
+    const img = e.target.closest("img.zoomable");
+    if (!img) return;
+    box.querySelector("img").src = img.src;
+    box.classList.add("open");
+  });
+}
+
 // 仅在展示页（存在内容容器时）自动加载渲染；编辑页不触发
 if (document.getElementById("content")) {
   load();
+  setupLightbox();
 }

@@ -170,7 +170,42 @@ button { font-family: inherit; cursor: pointer; }
 .card-eyebrow { font-size: 12px; font-weight: 700; color: var(--orange-2); letter-spacing: .5px; }
 .card-title { font-size: 17px; font-weight: 700; margin: 6px 0 8px; }
 .card-body { color: var(--text-dim); font-size: 14.5px; white-space: pre-wrap; }
-.card-img { width: 100%; border-radius: 10px; margin-bottom: 10px; display: block; }
+.card-imgs { margin-bottom: 10px; display: grid; gap: 6px; }
+.card-imgs.multi { grid-template-columns: repeat(2, 1fr); }
+.card-img { width: 100%; border-radius: 10px; display: block; }
+.card-img.zoomable { cursor: zoom-in; transition: filter .15s; }
+.card-img.zoomable:hover { filter: brightness(1.08); }
+.card-imgs.multi .card-img { aspect-ratio: 1 / 1; object-fit: cover; }
+
+/* 灯箱 */
+.lightbox {
+  position: fixed; inset: 0; z-index: 200;
+  display: none; place-items: center;
+  background: rgba(0,0,0,.88);
+  padding: 24px;
+  cursor: zoom-out;
+}
+.lightbox.open { display: grid; }
+.lightbox img { max-width: 96vw; max-height: 90vh; border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.lightbox-close {
+  position: absolute; top: 18px; right: 24px;
+  font-size: 30px; color: #fff; cursor: pointer; line-height: 1;
+  opacity: .8;
+}
+.lightbox-close:hover { opacity: 1; }
+
+/* 编辑页多图缩略 */
+.img-thumbs { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.img-thumb { position: relative; width: 92px; height: 92px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+.img-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.img-thumb-del {
+  position: absolute; top: 3px; right: 3px;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: none; background: rgba(0,0,0,.65); color: #fff;
+  font-size: 13px; line-height: 1; cursor: pointer;
+  display: grid; place-items: center;
+}
+.img-thumb-del:hover { background: var(--red); }
 .card-video {
   position: relative;
   width: 100%;

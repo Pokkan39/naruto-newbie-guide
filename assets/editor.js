@@ -10,6 +10,7 @@ let data = { site: { title: "火影忍者入坑教学", subtitle: "" }, nodes: [
 let editingId = null;      // 正在编辑的节点 id
 let addingParentId = null; // null=新增根章节；否则为父节点 id
 let collapsed = false;
+let editingImages = [];    // 当前编辑节点的图片列表（多图）
 
 /* ---------- 数据存取 ---------- */
 function save() {
@@ -144,18 +145,38 @@ function openNodeModal(id, parentId) {
   nodeForm.eyebrow.value = node.eyebrow || "";
   nodeForm.title.value = node.title || "";
   nodeForm.body.value = node.body || "";
-  nodeForm.image.value = node.image || "";
   nodeForm.video.value = node.video || "";
 
-  renderImgPreview(node.image || "");
+  // 兼容：旧数据是单个 image 字段，新数据是 images 数组
+  editingImages = Array.isArray(node.images)
+    ? node.images.slice()
+    : (node.image ? [node.image] : []);
+
+  renderImgPreview();
   renderVideoPreview(node.video || "");
   updateTypeFields();
   nodeModal.classList.add("open");
 }
 
-function renderImgPreview(src) {
+function renderImgPreview() {
   const box = document.getElementById("img-preview");
-  box.innerHTML = src ? `<img src="${esc(src)}" alt="预览" />` : "";
+  box.innerHTML = "";
+  if (!editingImages.length) {
+    box.innerHTML = `<div class="hint">还没有图片，点上方「选择文件」添加。</div>`;
+    return;
+  }
+  editingImages.forEach((src, i) => {
+    const thumb = document.createElement("div");
+    thumb.className = "img-thumb";
+    thumb.innerHTML =
+      `<img src="${esc(src)}" alt="图 ${i + 1}" />` +
+      `<button type="button" class="img-thumb-del" data-i="${i}" title="删除这张">✕</button>`;
+    thumb.querySelector(".img-thumb-del").addEventListener("click", () => {
+      editingImages.splice(i, 1);
+      renderImgPreview();
+    });
+    box.appendChild(thumb);
+  });
 }
 function renderVideoPreview(raw) {
   const box = document.getElementById("video-preview");
@@ -170,11 +191,18 @@ nodeForm.type.forEach && nodeForm.querySelectorAll('input[name="type"]').forEach
 );
 
 document.getElementById("img-file").addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => { nodeForm.image.value = reader.result; renderImgPreview(reader.result); };
-  reader.readAsDataURL(file);
+  const files = [...e.target.files];
+  if (!files.length) return;
+  let remaining = files.length;
+  files.forEach((file) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      editingImages.push(reader.result);
+      if (--remaining === 0) renderImgPreview();
+    };
+    reader.readAsDataURL(file);
+  });
+  e.target.value = ""; // 允许再次选同一批文件
 });
 
 nodeForm.video.addEventListener("input", () => renderVideoPreview(nodeForm.video.value));
@@ -186,12 +214,15 @@ nodeForm.addEventListener("submit", (e) => {
     eyebrow: nodeForm.eyebrow.value.trim(),
     title: nodeForm.title.value.trim(),
     body: nodeForm.body.value,
-    image: nodeForm.image.value,
+    images: editingImages.slice(),
     video: nodeForm.video.value.trim(),
   };
   if (editingId) {
     const f = findNode(editingId);
-    if (f) Object.assign(f.node, payload);
+    if (f) {
+      delete f.node.image; // 清掉旧的单图字段
+      Object.assign(f.node, payload);
+    }
   } else {
     const newNode = { id: uid(), ...payload, children: [] };
     if (addingParentId) {

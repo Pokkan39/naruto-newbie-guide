@@ -84,10 +84,10 @@
         </label>
 
         <div class="field" data-when="image">
-          <span>图片（上传本地图片，自动保存进文件）</span>
-          <input type="file" id="img-file" accept="image/*" />
-          <div class="upload-preview" id="img-preview"></div>
-          <input type="hidden" name="image" />
+          <span>图片（可一次选多张，或多次添加；拖不动就重复点选择）</span>
+          <input type="file" id="img-file" accept="image/*" multiple />
+          <div class="hint">支持一次选多张。已添加的图片可单独删除。展示页点击图片可放大查看。</div>
+          <div class="img-thumbs" id="img-preview"></div>
         </div>
 
         <div class="field" data-when="video">
