@@ -132,9 +132,21 @@
         </div>
 
         <div class="field" data-bg="image">
-          <span>背景图片（上传本地图片，自动压缩）</span>
+          <span>背景图片（上传本地图片，自动压缩；再传一张即替换）</span>
           <input type="file" id="bg-file" accept="image/*" />
           <div class="upload-preview" id="bg-preview"></div>
+
+          <span style="margin-top:10px">填充方式</span>
+          <div class="type-picker" id="bg-size-picker">
+            <label><input type="radio" name="bgSize" value="cover" checked /> 铺满（裁掉多余）</label>
+            <label><input type="radio" name="bgSize" value="contain" /> 完整（显示全图）</label>
+          </div>
+
+          <span style="margin-top:10px">水平位置（左 ↔ 右）</span>
+          <input type="range" name="bgPosX" min="0" max="100" step="1" value="50" />
+          <span style="margin-top:10px">垂直位置（上 ↕ 下）</span>
+          <input type="range" name="bgPosY" min="0" max="100" step="1" value="50" />
+
           <span style="margin-top:10px">变暗程度（图上加黑遮罩，保证文字看得清）</span>
           <input type="range" name="bgDim" min="0" max="0.85" step="0.05" value="0.55" />
           <input type="hidden" name="bgImage" />

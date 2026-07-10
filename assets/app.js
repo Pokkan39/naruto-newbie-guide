@@ -121,14 +121,22 @@ function applyBackground(site) {
   const b = document.body;
   b.style.backgroundImage = "";
   b.style.backgroundColor = "";
+  b.style.backgroundSize = "";
+  b.style.backgroundPosition = "";
   b.classList.remove("bg-image");
   if (bg.type === "color" && bg.color) {
     b.style.backgroundImage = "none";
     b.style.backgroundColor = bg.color;
   } else if (bg.type === "image" && bg.image) {
     b.classList.add("bg-image");
+    const dim = bg.dim != null ? bg.dim : 0.55;
     b.style.backgroundImage =
-      `linear-gradient(rgba(13,15,20,${bg.dim != null ? bg.dim : 0.55}), rgba(13,15,20,${bg.dim != null ? bg.dim : 0.55})), url("${bg.image}")`;
+      `linear-gradient(rgba(13,15,20,${dim}), rgba(13,15,20,${dim})), url("${bg.image}")`;
+    // 填充方式与位置
+    b.style.backgroundSize = (bg.size === "contain" ? "contain" : "cover");
+    const px = bg.posX != null ? bg.posX : 50;
+    const py = bg.posY != null ? bg.posY : 50;
+    b.style.backgroundPosition = `${px}% ${py}%`;
   }
   // type 为空或 "default" 时，保持样式表里的默认渐变背景
 }

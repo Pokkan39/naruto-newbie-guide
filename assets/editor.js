@@ -351,6 +351,9 @@ document.getElementById("btn-site").addEventListener("click", () => {
   siteForm.bgColor.value = bg.color || "#0d0f14";
   siteForm.bgImage.value = bg.image || "";
   siteForm.bgDim.value = bg.dim != null ? bg.dim : 0.55;
+  siteForm.bgSize.value = bg.size || "cover";
+  siteForm.bgPosX.value = bg.posX != null ? bg.posX : 50;
+  siteForm.bgPosY.value = bg.posY != null ? bg.posY : 50;
   renderBgPreview(bg.image || "");
   updateBgFields();
   document.getElementById("site-modal").classList.add("open");
@@ -364,7 +367,16 @@ document.getElementById("bg-file").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   flash("正在处理背景图…");
-  const dataUrl = await compressImage(file, 1920, 0.8);
+  // 背景图目标体积放宽到 600KB，保证清晰度
+  const dataUrl = await compressImage(file, 600 * 1024);
+  if (!dataUrl) {
+    const el = document.getElementById("status");
+    el.style.color = "var(--red)";
+    el.textContent = "⚠ 这张图无法读取（多为 iPhone HEIC 格式），请先转成 JPG/PNG 再上传。";
+    setTimeout(() => { el.style.color = ""; el.textContent = ""; }, 8000);
+    e.target.value = "";
+    return;
+  }
   siteForm.bgImage.value = dataUrl;
   renderBgPreview(dataUrl);
   flash("背景图已添加");
@@ -380,6 +392,9 @@ siteForm.addEventListener("submit", async (e) => {
     color: siteForm.bgColor.value,
     image: siteForm.bgImage.value,
     dim: parseFloat(siteForm.bgDim.value),
+    size: siteForm.bgSize.value,
+    posX: parseInt(siteForm.bgPosX.value, 10),
+    posY: parseInt(siteForm.bgPosY.value, 10),
   };
   if (await save()) closeModals();
 });
