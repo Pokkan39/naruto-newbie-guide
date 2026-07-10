@@ -1,7 +1,13 @@
 {
   "site": {
-    "title": "Hooxi也能看懂的火影忍者手游基础入坑指南",
-    "subtitle": "Naruto 新手入门 · 从创号到氪金全流程"
+    "title": "Hooxi也能看懂的火影忍者入坑指南",
+    "subtitle": "Naruto 新手入门 · 从创号到氪金全流程",
+    "background": {
+      "type": "default",
+      "color": "#0d0f14",
+      "image": "",
+      "dim": 0.55
+    }
   },
   "nodes": [
     {
