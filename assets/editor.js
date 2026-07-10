@@ -174,6 +174,12 @@ function renderImgPreview() {
     box.innerHTML = `<div class="hint">还没有图片，点上方「选择文件」添加。</div>`;
     return;
   }
+  const totalKB = Math.round(editingImages.reduce((s, u) => s + dataUrlBytes(u), 0) / 1024);
+  const info = document.createElement("div");
+  info.className = "hint";
+  info.style.width = "100%";
+  info.textContent = `共 ${editingImages.length} 张，合计约 ${totalKB} KB`;
+  box.appendChild(info);
   editingImages.forEach((src, i) => {
     const thumb = document.createElement("div");
     thumb.className = "img-thumb";
@@ -200,47 +206,94 @@ nodeForm.type.forEach && nodeForm.querySelectorAll('input[name="type"]').forEach
 );
 
 /* 压缩图片：限制最长边，输出 JPEG，大幅减小体积以适配本地存储 */
-function compressImage(file, maxSize = 1280, quality = 0.82) {
-  return new Promise((resolve) => {
-    // GIF 保持原样（压缩会丢动画）
-    if (file.type === "image/gif") {
-      const r = new FileReader();
-      r.onload = () => resolve(r.result);
-      r.readAsDataURL(file);
-      return;
-    }
+/* 把图片文件解码成 <img>。浏览器解不了码（如 iPhone 的 HEIC）会走 reject。 */
+function decodeImage(file) {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > maxSize || height > maxSize) {
-          if (width >= height) { height = Math.round(height * maxSize / width); width = maxSize; }
-          else { width = Math.round(width * maxSize / height); height = maxSize; }
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = width; canvas.height = height;
-        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-        // PNG 透明图转白底后压缩为 JPEG
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
-      img.onerror = () => resolve(reader.result); // 失败则用原图
+      img.onload = () => resolve({ img, dataUrl: reader.result });
+      img.onerror = () => reject(new Error("decode-failed"));
       img.src = reader.result;
     };
+    reader.onerror = () => reject(new Error("read-failed"));
     reader.readAsDataURL(file);
   });
+}
+
+/* base64 dataURL 的实际字节大小 */
+function dataUrlBytes(dataUrl) {
+  const i = dataUrl.indexOf(",");
+  const b64 = i >= 0 ? dataUrl.slice(i + 1) : dataUrl;
+  return Math.floor(b64.length * 3 / 4);
+}
+
+/* 自适应压缩：不断降尺寸/降质量，直到体积 <= 目标（默认 300KB）。
+   十几张普通照片这样也能轻松存下。返回 null 表示格式无法解码。 */
+async function compressImage(file, targetBytes = 300 * 1024) {
+  // GIF 动图不压缩，直接读取（压了会丢动画）
+  if (file.type === "image/gif") {
+    return await new Promise((res) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.readAsDataURL(file);
+    });
+  }
+  let decoded;
+  try {
+    decoded = await decodeImage(file);
+  } catch (e) {
+    return null; // 无法解码（HEIC 等）
+  }
+  const { img } = decoded;
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  // 逐档尝试：最长边从 1600 一路降，质量从 0.85 降到 0.5
+  const maxSizes = [1600, 1280, 1024, 800, 640];
+  const qualities = [0.85, 0.75, 0.65, 0.55];
+  let best = null;
+  for (const maxSize of maxSizes) {
+    let { width, height } = img;
+    if (width > maxSize || height > maxSize) {
+      if (width >= height) { height = Math.round(height * maxSize / width); width = maxSize; }
+      else { width = Math.round(width * maxSize / height); height = maxSize; }
+    }
+    canvas.width = width; canvas.height = height;
+    ctx.fillStyle = "#fff"; // 透明PNG铺白底
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(img, 0, 0, width, height);
+    for (const q of qualities) {
+      const url = canvas.toDataURL("image/jpeg", q);
+      const bytes = dataUrlBytes(url);
+      if (!best || bytes < best.bytes) best = { url, bytes };
+      if (bytes <= targetBytes) return url; // 达标即用
+    }
+  }
+  return best ? best.url : null; // 都没达标就用最小的那版
 }
 
 document.getElementById("img-file").addEventListener("change", async (e) => {
   const files = [...e.target.files];
   if (!files.length) return;
-  flash("正在处理图片…");
+  const failed = [];
+  let done = 0;
   for (const file of files) {
+    flash(`正在处理图片… ${done + 1}/${files.length}`);
     const dataUrl = await compressImage(file);
-    editingImages.push(dataUrl);
+    if (dataUrl) { editingImages.push(dataUrl); done++; }
+    else failed.push(file.name);
   }
   renderImgPreview();
-  flash("图片已添加（已自动压缩）");
+  if (failed.length) {
+    const el = document.getElementById("status");
+    el.style.color = "var(--red)";
+    el.textContent = `⚠ 有 ${failed.length} 张无法读取（多为 iPhone 的 HEIC 格式）：${failed.join("、")}。` +
+      `请在手机设置→相机→格式，改为「兼容性(JPEG)」后重拍/重发，或先转成 JPG/PNG 再上传。`;
+    setTimeout(() => { el.style.color = ""; el.textContent = ""; }, 9000);
+  } else {
+    flash(`已添加 ${done} 张（自动压缩）`);
+  }
   e.target.value = ""; // 允许再次选同一批文件
 });
 
