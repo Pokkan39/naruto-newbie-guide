@@ -1,6 +1,59 @@
 /* ===== 展示页逻辑：加载内容 + 渲染目录树卡片 ===== */
 const STORAGE_KEY = "naruto-wiki-content";
 
+/* ===== 本地存储：IndexedDB（容量大，可存大量图片；localStorage 仅约5MB会爆） ===== */
+const IDB_NAME = "naruto-wiki-db";
+const IDB_STORE = "kv";
+
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbSet(key, value) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    tx.objectStore(IDB_STORE).put(value, key);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error("aborted"));
+  });
+}
+async function idbGet(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, "readonly");
+    const r = tx.objectStore(IDB_STORE).get(key);
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+
+/* 读取本地内容：优先 IndexedDB；没有则尝试把旧 localStorage 数据迁移过来 */
+async function loadLocalContent() {
+  try {
+    const v = await idbGet(STORAGE_KEY);
+    if (v) return typeof v === "string" ? JSON.parse(v) : v;
+  } catch (e) { /* 忽略，走回退 */ }
+  // 旧版本数据迁移
+  try {
+    const legacy = localStorage.getItem(STORAGE_KEY);
+    if (legacy) {
+      const obj = JSON.parse(legacy);
+      try { await idbSet(STORAGE_KEY, obj); localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+      return obj;
+    }
+  } catch (e) {}
+  return null;
+}
+
 /* 把用户输入的视频（BV号 / B站链接 / YouTube / 通用iframe链接）转成可嵌入的 iframe src */
 function toEmbedUrl(raw) {
   if (!raw) return "";
@@ -165,10 +218,10 @@ function setupScrollSpy() {
 
 /* 加载：优先本地保存（编辑预览），否则读 content.json */
 async function load() {
-  const local = localStorage.getItem(STORAGE_KEY);
-  if (local) {
-    try { render(JSON.parse(local)); return; } catch (e) { /* 坏数据则回退 */ }
-  }
+  try {
+    const local = await loadLocalContent();
+    if (local) { render(local); return; }
+  } catch (e) { /* 坏数据则回退 */ }
   try {
     const res = await fetch("content.json", { cache: "no-store" });
     const data = await res.json();

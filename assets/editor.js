@@ -12,17 +12,16 @@ let addingParentId = null; // null=新增根章节；否则为父节点 id
 let collapsed = false;
 let editingImages = [];    // 当前编辑节点的图片列表（多图）
 
-/* ---------- 数据存取 ---------- */
-function save() {
+/* ---------- 数据存取（IndexedDB，容量大，可存大量图片） ---------- */
+async function save() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    await idbSet(STORAGE_KEY, data);
     flash("已自动保存到本浏览器");
     return true;
   } catch (err) {
-    // localStorage 约 5MB 上限，图片过多/过大时会超限
     const el = document.getElementById("status");
     el.style.color = "var(--red)";
-    el.textContent = "⚠ 本地保存空间已满（图片太多太大）。请减少图片或用更小的图，改动可能未保存。建议先「导出」备份。";
+    el.textContent = "⚠ 保存失败（可能磁盘空间不足或浏览器限制）。改动可能未保存，建议先「导出」备份。";
     setTimeout(() => { el.style.color = ""; el.textContent = ""; }, 6000);
     return false;
   }
@@ -38,10 +37,10 @@ function uid() {
 }
 
 async function loadData() {
-  const local = localStorage.getItem(STORAGE_KEY);
-  if (local) {
-    try { data = JSON.parse(local); normalize(); return; } catch (e) {}
-  }
+  try {
+    const local = await loadLocalContent();
+    if (local) { data = local; normalize(); return; }
+  } catch (e) {}
   try {
     const res = await fetch("content.json", { cache: "no-store" });
     data = await res.json();
@@ -247,7 +246,7 @@ document.getElementById("img-file").addEventListener("change", async (e) => {
 
 nodeForm.video.addEventListener("input", () => renderVideoPreview(nodeForm.video.value));
 
-nodeForm.addEventListener("submit", (e) => {
+nodeForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const payload = {
     type: nodeForm.type.value,
@@ -272,7 +271,7 @@ nodeForm.addEventListener("submit", (e) => {
       data.nodes.push(newNode);
     }
   }
-  const ok = save();
+  const ok = await save();
   renderTree();
   if (ok) closeModals();
 });
@@ -319,7 +318,7 @@ document.getElementById("bg-file").addEventListener("change", async (e) => {
   e.target.value = "";
 });
 
-siteForm.addEventListener("submit", (e) => {
+siteForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   data.site.title = siteForm.title.value.trim();
   data.site.subtitle = siteForm.subtitle.value.trim();
@@ -329,7 +328,7 @@ siteForm.addEventListener("submit", (e) => {
     image: siteForm.bgImage.value,
     dim: parseFloat(siteForm.bgDim.value),
   };
-  if (save()) closeModals();
+  if (await save()) closeModals();
 });
 
 /* ---------- 工具栏 ---------- */
