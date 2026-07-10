@@ -14,8 +14,18 @@ let editingImages = [];    // 当前编辑节点的图片列表（多图）
 
 /* ---------- 数据存取 ---------- */
 function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  flash("已自动保存到本浏览器");
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    flash("已自动保存到本浏览器");
+    return true;
+  } catch (err) {
+    // localStorage 约 5MB 上限，图片过多/过大时会超限
+    const el = document.getElementById("status");
+    el.style.color = "var(--red)";
+    el.textContent = "⚠ 本地保存空间已满（图片太多太大）。请减少图片或用更小的图，改动可能未保存。建议先「导出」备份。";
+    setTimeout(() => { el.style.color = ""; el.textContent = ""; }, 6000);
+    return false;
+  }
 }
 function flash(msg) {
   const el = document.getElementById("status");
@@ -190,18 +200,48 @@ nodeForm.type.forEach && nodeForm.querySelectorAll('input[name="type"]').forEach
   r.addEventListener("change", updateTypeFields)
 );
 
-document.getElementById("img-file").addEventListener("change", (e) => {
-  const files = [...e.target.files];
-  if (!files.length) return;
-  let remaining = files.length;
-  files.forEach((file) => {
+/* 压缩图片：限制最长边，输出 JPEG，大幅减小体积以适配本地存储 */
+function compressImage(file, maxSize = 1280, quality = 0.82) {
+  return new Promise((resolve) => {
+    // GIF 保持原样（压缩会丢动画）
+    if (file.type === "image/gif") {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.readAsDataURL(file);
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
-      editingImages.push(reader.result);
-      if (--remaining === 0) renderImgPreview();
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxSize || height > maxSize) {
+          if (width >= height) { height = Math.round(height * maxSize / width); width = maxSize; }
+          else { width = Math.round(width * maxSize / height); height = maxSize; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        // PNG 透明图转白底后压缩为 JPEG
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = () => resolve(reader.result); // 失败则用原图
+      img.src = reader.result;
     };
     reader.readAsDataURL(file);
   });
+}
+
+document.getElementById("img-file").addEventListener("change", async (e) => {
+  const files = [...e.target.files];
+  if (!files.length) return;
+  flash("正在处理图片…");
+  for (const file of files) {
+    const dataUrl = await compressImage(file);
+    editingImages.push(dataUrl);
+  }
+  renderImgPreview();
+  flash("图片已添加（已自动压缩）");
   e.target.value = ""; // 允许再次选同一批文件
 });
 
@@ -232,24 +272,64 @@ nodeForm.addEventListener("submit", (e) => {
       data.nodes.push(newNode);
     }
   }
-  save();
+  const ok = save();
   renderTree();
-  closeModals();
+  if (ok) closeModals();
 });
 
-/* ---------- 站点标题弹窗 ---------- */
+/* ---------- 站点标题 + 背景弹窗 ---------- */
 const siteForm = document.getElementById("site-form");
+
+function updateBgFields() {
+  const type = siteForm.bgType.value;
+  siteForm.querySelectorAll("[data-bg]").forEach((el) => {
+    el.style.display = el.dataset.bg === type ? "" : "none";
+  });
+}
+function renderBgPreview(src) {
+  const box = document.getElementById("bg-preview");
+  box.innerHTML = src ? `<img src="${esc(src)}" alt="背景预览" />` : "";
+}
+
 document.getElementById("btn-site").addEventListener("click", () => {
   siteForm.title.value = data.site.title || "";
   siteForm.subtitle.value = data.site.subtitle || "";
+  const bg = data.site.background || {};
+  siteForm.bgType.value = bg.type || "default";
+  siteForm.bgColor.value = bg.color || "#0d0f14";
+  siteForm.bgImage.value = bg.image || "";
+  siteForm.bgDim.value = bg.dim != null ? bg.dim : 0.55;
+  renderBgPreview(bg.image || "");
+  updateBgFields();
   document.getElementById("site-modal").classList.add("open");
 });
+
+siteForm.querySelectorAll('input[name="bgType"]').forEach((r) =>
+  r.addEventListener("change", updateBgFields)
+);
+
+document.getElementById("bg-file").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  flash("正在处理背景图…");
+  const dataUrl = await compressImage(file, 1920, 0.8);
+  siteForm.bgImage.value = dataUrl;
+  renderBgPreview(dataUrl);
+  flash("背景图已添加");
+  e.target.value = "";
+});
+
 siteForm.addEventListener("submit", (e) => {
   e.preventDefault();
   data.site.title = siteForm.title.value.trim();
   data.site.subtitle = siteForm.subtitle.value.trim();
-  save();
-  closeModals();
+  data.site.background = {
+    type: siteForm.bgType.value,
+    color: siteForm.bgColor.value,
+    image: siteForm.bgImage.value,
+    dim: parseFloat(siteForm.bgDim.value),
+  };
+  if (save()) closeModals();
 });
 
 /* ---------- 工具栏 ---------- */

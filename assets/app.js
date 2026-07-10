@@ -62,12 +62,31 @@ function renderCard(node) {
   return card;
 }
 
+/* 应用背景设置：默认 / 纯色 / 背景图 */
+function applyBackground(site) {
+  const bg = (site && site.background) || {};
+  const b = document.body;
+  b.style.backgroundImage = "";
+  b.style.backgroundColor = "";
+  b.classList.remove("bg-image");
+  if (bg.type === "color" && bg.color) {
+    b.style.backgroundImage = "none";
+    b.style.backgroundColor = bg.color;
+  } else if (bg.type === "image" && bg.image) {
+    b.classList.add("bg-image");
+    b.style.backgroundImage =
+      `linear-gradient(rgba(13,15,20,${bg.dim != null ? bg.dim : 0.55}), rgba(13,15,20,${bg.dim != null ? bg.dim : 0.55})), url("${bg.image}")`;
+  }
+  // type 为空或 "default" 时，保持样式表里的默认渐变背景
+}
+
 /* 渲染整棵树：顶层节点 = 章，子节点 = 卡片 */
 function render(data) {
   const site = data.site || {};
   document.getElementById("site-title").textContent = site.title || "火影忍者入坑教学";
   document.getElementById("site-subtitle").textContent = site.subtitle || "";
   if (site.title) document.title = site.title;
+  applyBackground(site);
 
   const toc = document.getElementById("toc");
   const content = document.getElementById("content");
@@ -159,26 +178,59 @@ async function load() {
   }
 }
 
-/* ---------- 图片点击放大（灯箱） ---------- */
+/* ---------- 图片点击放大（灯箱，支持多图切换） ---------- */
+let lbGroup = [];   // 当前打开的一组图片
+let lbIndex = 0;
+
 function setupLightbox() {
   let box = document.getElementById("lightbox");
   if (!box) {
     box = document.createElement("div");
     box.id = "lightbox";
     box.className = "lightbox";
-    box.innerHTML = `<span class="lightbox-close" aria-label="关闭">✕</span><img alt="放大查看" />`;
+    box.innerHTML =
+      `<span class="lightbox-close" aria-label="关闭">✕</span>` +
+      `<button class="lightbox-nav prev" aria-label="上一张">‹</button>` +
+      `<img alt="放大查看" />` +
+      `<button class="lightbox-nav next" aria-label="下一张">›</button>` +
+      `<span class="lightbox-count"></span>`;
     document.body.appendChild(box);
+
     const close = () => box.classList.remove("open");
+    const show = (i) => {
+      if (!lbGroup.length) return;
+      lbIndex = (i + lbGroup.length) % lbGroup.length;
+      box.querySelector("img").src = lbGroup[lbIndex];
+      box.querySelector(".lightbox-count").textContent =
+        lbGroup.length > 1 ? `${lbIndex + 1} / ${lbGroup.length}` : "";
+      box.querySelectorAll(".lightbox-nav").forEach((b) => {
+        b.style.display = lbGroup.length > 1 ? "" : "none";
+      });
+    };
+    box._show = show;
+
+    // 点背景关闭；点图片/按钮不关闭
     box.addEventListener("click", close);
     box.querySelector("img").addEventListener("click", (e) => e.stopPropagation());
-    box.querySelector("img").addEventListener("click", close);
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+    box.querySelector(".prev").addEventListener("click", (e) => { e.stopPropagation(); show(lbIndex - 1); });
+    box.querySelector(".next").addEventListener("click", (e) => { e.stopPropagation(); show(lbIndex + 1); });
+    box.querySelector(".lightbox-close").addEventListener("click", (e) => { e.stopPropagation(); close(); });
+    document.addEventListener("keydown", (e) => {
+      if (!box.classList.contains("open")) return;
+      if (e.key === "Escape") close();
+      else if (e.key === "ArrowLeft") show(lbIndex - 1);
+      else if (e.key === "ArrowRight") show(lbIndex + 1);
+    });
   }
+
   document.getElementById("content").addEventListener("click", (e) => {
     const img = e.target.closest("img.zoomable");
     if (!img) return;
-    box.querySelector("img").src = img.src;
+    const wrap = img.closest(".card-imgs");
+    lbGroup = wrap ? [...wrap.querySelectorAll("img")].map((im) => im.src) : [img.src];
+    const start = wrap ? [...wrap.querySelectorAll("img")].indexOf(img) : 0;
     box.classList.add("open");
+    box._show(start < 0 ? 0 : start);
   });
 }
 
