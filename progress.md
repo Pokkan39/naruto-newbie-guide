@@ -107,3 +107,22 @@
 - progress.md：追加本轮实施和验证记录。
 
 回滚方式：推送前可用 `git restore index.html edit.html assets/app.js assets/style.css progress.md` 撤销本轮未提交改动；提交后使用 `git revert <本轮提交哈希>` 创建回滚提交。
+
+## 2025-07-10 - Task: 发布并验收 GitHub Pages
+
+### What was done
+- 将展示页升级、数据源隔离和完整内容发布到 GitHub main 分支，首个发布提交为 `26ea3a5`。
+- GitHub Pages 已完成更新，公开首页和编辑页均已加载新版结构。
+
+### Testing
+- `git push origin main` 成功，远程 `origin/main` 与本地 HEAD 均指向 `26ea3a54cc4006d6f4cf31123bcb68104b31ce90`。
+- 线上首页、编辑页和 content.json 均返回 HTTP 200。
+- 线上 app.js 已包含 `setupPageInteractions` 和 `draftMode`，证明新版交互和公开/草稿数据源隔离已部署。
+- 线上首页已确认包含 Hero、阅读进度条和返回顶部结构；线上编辑页已确认预览链接为 `index.html?draft=1`。
+- 完整 content.json 已在提交 `0700745` 纳入 main，发布前本地解析确认 8 章、30 卡片、25 图片、约 11MB；线上 content.json HTTP 200。
+
+### Notes
+改动文件：
+- progress.md：追加 GitHub Pages 发布和线上验收证据。
+
+回滚方式：使用 `git revert 26ea3a5` 回滚展示页与数据源隔离；如需连同完整内容一起回退，再对 `0700745` 创建 revert 提交并推送。
