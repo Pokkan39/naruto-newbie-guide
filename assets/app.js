@@ -92,8 +92,8 @@ function esc(s) {
 
 /* 渲染单张卡片 */
 function renderCard(node) {
-  const card = document.createElement("div");
-  card.className = "card";
+  const card = document.createElement("article");
+  card.className = "card reveal";
   let media = "";
   // 兼容旧的单图字段 image，新的是 images 数组
   const imgs = Array.isArray(node.images) ? node.images : (node.image ? [node.image] : []);
@@ -144,9 +144,15 @@ function applyBackground(site) {
 /* 渲染整棵树：顶层节点 = 章，子节点 = 卡片 */
 function render(data) {
   const site = data.site || {};
-  document.getElementById("site-title").textContent = site.title || "火影忍者入坑教学";
-  document.getElementById("site-subtitle").textContent = site.subtitle || "";
-  if (site.title) document.title = site.title;
+  const title = site.title || "火影忍者入坑教学";
+  const subtitle = site.subtitle || "从创建账号到玩法解锁，一步一步跟着走。";
+  document.getElementById("site-title").textContent = title;
+  document.getElementById("site-subtitle").textContent = subtitle;
+  const heroTitle = document.getElementById("hero-title");
+  const heroSubtitle = document.getElementById("hero-subtitle");
+  if (heroTitle) heroTitle.textContent = title;
+  if (heroSubtitle) heroSubtitle.textContent = subtitle;
+  document.title = title;
   applyBackground(site);
 
   const toc = document.getElementById("toc");
@@ -155,12 +161,17 @@ function render(data) {
   content.innerHTML = "";
 
   const nodes = data.nodes || [];
+  const totalCards = nodes.reduce((sum, n) => sum + (n.children || []).length, 0);
+  const chapterCount = document.getElementById("chapter-count");
+  const cardCount = document.getElementById("card-count");
+  if (chapterCount) chapterCount.textContent = nodes.length;
+  if (cardCount) cardCount.textContent = totalCards;
   if (!nodes.length) {
     content.innerHTML = `<div class="empty-state"><strong>还没有内容</strong>点右上角「编辑」开始添加吧。</div>`;
     return;
   }
 
-  nodes.forEach((chapter) => {
+  nodes.forEach((chapter, chapterIndex) => {
     // 侧边目录
     const li = document.createElement("li");
     li.innerHTML = `<a class="toc-link" href="#${chapter.id}">${esc(chapter.title || "未命名")}</a>`;
@@ -176,14 +187,18 @@ function render(data) {
 
     // 章节区块
     const section = document.createElement("section");
-    section.className = "chapter";
+    section.className = "chapter reveal";
     section.id = chapter.id;
+    section.style.setProperty("--chapter-index", chapterIndex);
     const head = document.createElement("div");
     head.className = "chapter-head";
     head.innerHTML =
+      `<span class="chapter-number">${String(chapterIndex + 1).padStart(2, "0")}</span>` +
+      `<div class="chapter-head-copy">` +
       (chapter.eyebrow ? `<span class="eyebrow">${esc(chapter.eyebrow)}</span>` : "") +
       `<h2 class="chapter-title">${esc(chapter.title || "未命名")}</h2>` +
-      (chapter.body ? `<p class="chapter-desc">${esc(chapter.body)}</p>` : "");
+      (chapter.body ? `<p class="chapter-desc">${esc(chapter.body)}</p>` : "") +
+      `</div>`;
     section.appendChild(head);
 
     const cards = document.createElement("div");
@@ -193,6 +208,7 @@ function render(data) {
       const cardWrap = renderCard(child);
       cardWrap.id = child.id;
       cardWrap.style.scrollMarginTop = "92px";
+      cardWrap.style.setProperty("--card-index", cards.children.length);
       cards.appendChild(cardWrap);
     });
     if (cards.children.length) section.appendChild(cards);
@@ -200,6 +216,7 @@ function render(data) {
   });
 
   setupScrollSpy();
+  setupReveal();
 }
 
 /* 目录高亮跟随滚动 */
@@ -224,12 +241,20 @@ function setupScrollSpy() {
   targets.forEach((t) => io.observe(t));
 }
 
-/* 加载：优先本地保存（编辑预览），否则读 content.json */
+/* 加载：公开页永远读取线上内容；仅 ?draft=1 读取当前浏览器草稿 */
 async function load() {
-  try {
-    const local = await loadLocalContent();
-    if (local) { render(local); return; }
-  } catch (e) { /* 坏数据则回退 */ }
+  const draftMode = new URLSearchParams(location.search).get("draft") === "1";
+  if (draftMode) {
+    try {
+      const local = await loadLocalContent();
+      if (local) {
+        const badge = document.getElementById("draft-badge");
+        if (badge) badge.hidden = false;
+        render(local);
+        return;
+      }
+    } catch (e) { /* 草稿读取失败则回退公开内容 */ }
+  }
   try {
     const res = await fetch("content.json", { cache: "no-store" });
     const data = await res.json();
@@ -295,8 +320,44 @@ function setupLightbox() {
   });
 }
 
+/* ---------- 滚入动画 ---------- */
+function setupReveal() {
+  const items = [...document.querySelectorAll(".reveal")];
+  if (!items.length) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) {
+    items.forEach((el) => el.classList.add("is-visible"));
+    return;
+  }
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add("is-visible");
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.08, rootMargin: "0px 0px -40px" });
+  items.forEach((el) => observer.observe(el));
+}
+
+/* ---------- 阅读进度与返回顶部 ---------- */
+function setupPageInteractions() {
+  const bar = document.getElementById("scroll-progress-bar");
+  const backTop = document.getElementById("back-top");
+  const update = () => {
+    const max = document.documentElement.scrollHeight - innerHeight;
+    const progress = max > 0 ? Math.min(1, scrollY / max) : 0;
+    if (bar) bar.style.transform = `scaleX(${progress})`;
+    if (backTop) backTop.classList.toggle("show", scrollY > 520);
+  };
+  addEventListener("scroll", update, { passive: true });
+  addEventListener("resize", update, { passive: true });
+  if (backTop) backTop.addEventListener("click", () => scrollTo({ top: 0, behavior: "smooth" }));
+  update();
+}
+
 // 仅在展示页（存在内容容器时）自动加载渲染；编辑页不触发
 if (document.getElementById("content")) {
   load();
   setupLightbox();
+  setupPageInteractions();
 }

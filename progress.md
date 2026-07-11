@@ -82,3 +82,28 @@
 - 删除远程 naruto-wiki/ 嵌套重复文件夹。
 
 回滚方式：git revert 4d7dd6d（及之前 33d9be1）可回退本轮改动；本地删 Desktop\naruto-wiki 文件夹。
+
+## 2025-07-10 - Task: 隔离线上内容与本地草稿并升级展示页视觉
+
+### What was done
+- 普通访问统一读取线上 content.json，只有编辑页使用带 `?draft=1` 的预览入口时才读取当前浏览器的 IndexedDB 草稿，避免访客看到各自旧草稿。
+- 展示页升级为原创橙黑忍者主题，加入首屏引导、章节与卡片统计、章节编号、修行路线、玻璃卡片、查克拉光效和手机端横向目录。
+- 加入滚入动画、阅读进度、返回顶部、图片灯箱过渡，并为减少动态效果的系统偏好提供兼容。
+
+### Testing
+- Node 语法检查通过：assets/app.js 与 assets/editor.js 均可编译。
+- content.json 解析通过，确认标题正确，内容为 8 章、30 张卡片、25 张图片，文件约 11.0MB。
+- 本地 HTTP 服务验证 index.html、edit.html、content.json、style.css、app.js、editor.js 均返回 HTTP 200。
+- 检查确认普通模式 fetch 线上 content.json，`?draft=1` 模式才调用 IndexedDB 草稿；错误文件名 `content .json` 已清除。
+- git diff --check 通过；仅有仓库现有行尾转换提示，无补丁空白错误。
+- 尚未完成线上 GitHub Pages 的真实浏览器渲染确认；需推送并等待 Pages 部署后复核。
+
+### Notes
+改动文件：
+- index.html：新增展示页首屏、统计、阅读进度、草稿标识和返回顶部结构。
+- edit.html：预览入口改为 `index.html?draft=1`，确保编辑预览读取本地草稿。
+- assets/app.js：隔离公开/草稿数据源，并加入统计、章节编号、滚入动画、阅读进度和返回顶部交互。
+- assets/style.css：新增展示页原创忍者主题、互动动画、响应式布局及减少动态效果兼容。
+- progress.md：追加本轮实施和验证记录。
+
+回滚方式：推送前可用 `git restore index.html edit.html assets/app.js assets/style.css progress.md` 撤销本轮未提交改动；提交后使用 `git revert <本轮提交哈希>` 创建回滚提交。

@@ -7,28 +7,52 @@
   <link rel="icon" href="assets/logo.svg" />
   <link rel="stylesheet" href="assets/style.css" />
 </head>
-<body>
+<body class="public-page">
+  <div class="scroll-progress" aria-hidden="true"><span id="scroll-progress-bar"></span></div>
+  <div class="chakra-orb chakra-orb-one" aria-hidden="true"></div>
+  <div class="chakra-orb chakra-orb-two" aria-hidden="true"></div>
+
   <header class="topbar">
-    <div class="brand">
+    <a class="brand" href="#top" aria-label="返回顶部">
       <span class="brand-mark"><img src="assets/logo.svg" alt="" /></span>
       <span class="brand-copy">
         <span class="brand-title" id="site-title">火影忍者入坑教学</span>
         <span class="brand-subtitle" id="site-subtitle"></span>
       </span>
-    </div>
+    </a>
     <nav class="top-actions">
-      <a class="btn btn-primary" href="edit.html">✎ 编辑</a>
+      <span class="draft-badge" id="draft-badge" hidden>本地草稿预览</span>
+      <a class="btn btn-primary" href="edit.html"><span>编辑内容</span><b aria-hidden="true">✦</b></a>
     </nav>
   </header>
 
+  <section class="hero" id="top">
+    <div class="hero-mark" aria-hidden="true"><span></span></div>
+    <div class="hero-copy">
+      <span class="hero-kicker">NINJA BEGINNER GUIDE</span>
+      <h1 id="hero-title">火影忍者手游基础入坑指南</h1>
+      <p id="hero-subtitle">从创建账号到玩法解锁，一步一步跟着走。</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary hero-cta" href="#content">开始修行 <span aria-hidden="true">↓</span></a>
+        <div class="hero-stats" aria-label="指南内容统计">
+          <span><strong id="chapter-count">0</strong> 个章节</span>
+          <i></i>
+          <span><strong id="card-count">0</strong> 张教学卡</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-seal" aria-hidden="true"><span>忍</span></div>
+  </section>
+
   <main class="layout">
     <aside class="sidebar">
-      <h2>目录</h2>
+      <div class="sidebar-head"><span>修行目录</span><small>MISSION MAP</small></div>
       <ul class="toc-list" id="toc"></ul>
     </aside>
     <section class="content" id="content"></section>
   </main>
 
+  <button class="back-top" id="back-top" type="button" aria-label="返回顶部">↑</button>
   <script src="assets/app.js"></script>
 </body>
 </html>
